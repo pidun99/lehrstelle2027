@@ -253,11 +253,33 @@ function setMode(m, text){
   document.getElementById("syncText").textContent = text;
 }
 
+const NTFY_TOPIC = "lehrstellen2027-a1d85630c0";
+const pending = {};
+function notify(id, before){
+  clearTimeout(pending[id]);
+  pending[id] = setTimeout(()=>{
+    delete pending[id]; delete pending["_b_" + id];
+    const f = FIRMEN.find(x=>x.id === id), e = entry(id);
+    if (e.beworben === before.beworben && e.stand === before.stand) return;
+    const done = FIRMEN.filter(x=>entry(x.id).beworben).length;
+    let msg;
+    if (e.beworben && !before.beworben) msg = "Beworben bei " + f.name + " (" + f.ort + ")";
+    else if (!e.beworben && before.beworben) msg = "Haken entfernt bei " + f.name;
+    else msg = f.name + ": " + e.stand;
+    msg += "\n" + done + " von " + FIRMEN.length + " Bewerbungen verschickt";
+    const tag = e.stand === "Zusage" ? "tada" : e.stand === "Absage" ? "x" : "briefcase";
+    const url = "https://ntfy.sh/" + NTFY_TOPIC + "?title=" + encodeURIComponent("Lehrstellen-Update") + "&tags=" + tag;
+    try { fetch(url, {method:"POST", body: msg}).catch(()=>{}); } catch(err){}
+  }, 2500);
+}
 function commit(id, e){
+  const before = {...entry(id)};
+  if (!pending["_b_" + id]) pending["_b_" + id] = before;
   state[id] = clean(e);
   saveLocal();
   render();
-  
+  const base = pending["_b_" + id];
+  notify(id, base);
 }
 
 function enqueue(id){
